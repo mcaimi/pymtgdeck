@@ -5,13 +5,15 @@ import pytest
 # test the Binder class
 def test_binder_create():
     # create a Binder object
-    binder = Binder()
+    binder = Binder(name="Test Binder")
+    assert binder.name == "Test Binder"
     assert binder.entries == []
 
 # test the Binder class
 def test_binder_add_card():
     # create a Binder object
-    binder = Binder()
+    binder = Binder(name="Test Binder")
+    assert binder.name == "Test Binder"
 
     # load card from json file
     card = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')
@@ -119,7 +121,8 @@ def test_binder_has_card():
 # test serialization
 def test_binder_serialization():
     # create a Binder object
-    binder = Binder()
+    binder = Binder(name="Test Binder")
+    assert binder.name == "Test Binder"
 
     # load card from json file
     card = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')
@@ -130,12 +133,13 @@ def test_binder_serialization():
     binder.add_card(card)
     binder.add_card(card2)
     binder.add_card(card3)
-    assert binder.to_dict() == {'entries': [Entry(card=card, count=1).to_dict(), Entry(card=card2, count=1).to_dict(), Entry(card=card3, count=1).to_dict()]}
+    assert binder.to_dict() == {'name': "Test Binder", 'entries': [Entry(card=card, count=1).to_dict(), Entry(card=card2, count=1).to_dict(), Entry(card=card3, count=1).to_dict()]}
 
 # test deserialization
 def test_binder_deserialization():
     # create a Binder object
-    binder = Binder()
+    binder = Binder(name="Test Binder")
+    assert binder.name == "Test Binder"
 
     # load card from json file
     card = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')
@@ -146,7 +150,7 @@ def test_binder_deserialization():
     binder.add_card(card)
     binder.add_card(card2)
     binder.add_card(card3)
-    assert binder.to_dict() == {'entries': [Entry(card=card, count=1).to_dict(), Entry(card=card2, count=1).to_dict(), Entry(card=card3, count=1).to_dict()]}
+    assert binder.to_dict() == {'name': "Test Binder", 'entries': [Entry(card=card, count=1).to_dict(), Entry(card=card2, count=1).to_dict(), Entry(card=card3, count=1).to_dict()]}
 
     # deserialize binder
     binder2 = Binder.from_dict(binder.to_dict())

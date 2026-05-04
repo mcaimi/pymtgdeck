@@ -8,6 +8,7 @@ def test_deck_create():
     deck = Deck()
 
     # check deck attributes
+    assert deck.name == "MTG Deck (Default)"
     assert deck.entries == []
     assert deck.max_card_copy_count == 4
     assert deck.max_card_count == 40
@@ -15,7 +16,8 @@ def test_deck_create():
 # test the Deck class
 def test_deck_add_card():
     # create a Deck object
-    deck = Deck()
+    deck = Deck(name="Test Deck")
+    assert deck.name == "Test Deck"
 
     # load card from json file
     card = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')
@@ -35,7 +37,8 @@ def test_deck_add_card():
 # test remove card from deck
 def test_deck_remove_card():
     # create a Deck object
-    deck = Deck()
+    deck = Deck(name="Test Deck")
+    assert deck.name == "Test Deck"
 
     # load card from json file
     card = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')
@@ -83,7 +86,8 @@ def test_deck_remove_card():
 # test exceed max card copy count
 def test_deck_exceed_max_card_copy_count():
     # create a Deck object
-    deck = Deck()
+    deck = Deck(name="Test Deck")
+    assert deck.name == "Test Deck"
 
     # load card from json file
     card = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')
@@ -99,7 +103,8 @@ def test_deck_exceed_max_card_copy_count():
 # test exceed max card count
 def test_deck_exceed_max_card_count():
     # create a Deck object
-    deck = Deck(max_card_count=2)
+    deck = Deck(max_card_count=2, name="Test Deck")
+    assert deck.name == "Test Deck"
 
     # load card from json file
     card = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')
