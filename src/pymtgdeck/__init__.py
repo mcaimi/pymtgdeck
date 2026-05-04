@@ -2,8 +2,10 @@
 
 # pymtgdeck package
 
-from .entry import Entry
-from .binder import Binder
-from .deck import Deck
+from .entities.entry import Entry
+from .entities.binder import Binder
+from .entities.deck import Deck
+from .persistence.registry import Registry
+from .persistence.backend import Backend
 
-__all__ = ['Entry', 'Binder', 'Deck']
+__all__ = ['Entry', 'Binder', 'Deck', 'Registry', 'Backend']
