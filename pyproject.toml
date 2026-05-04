@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pymtgdeck"
+version = "0.1.0"
+description = "Python library that helps maintaining Magic: The Gathering Decks and Virtual Binders"
+readme = "README.md"
+license = {text = "GNU General Public License v3.0"}
+requires-python = ">=3.12"
+dependencies = [
+    "pyscryfall==0.1.2",
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Typing :: Typed",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<9",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
