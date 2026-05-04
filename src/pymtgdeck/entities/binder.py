@@ -14,8 +14,9 @@ except ImportError as e:
 # The binder will be a list of Entry objects.
 # Each item can be present any number of times in the binder.
 class Binder:
-    def __init__(self):
+    def __init__(self, name: str = "MTG Binder (Default)"):
         self.entries = []
+        self.name = name
 
     # Add an item to the binder. If the item is already in the binder, increment the number of copies.
     # If the item is not in the binder, add it to the binder.
@@ -53,17 +54,18 @@ class Binder:
     # serialize binder to dictionary
     def to_dict(self) -> dict:
         return {
+            "name": self.name,
             "entries": [entry.to_dict() for entry in self.entries]
         }
 
     # deserialize binder from dictionary
     @classmethod
     def from_dict(cls, dump_dict: dict) -> 'Binder':
-        if 'entries' not in dump_dict:
+        if 'name' not in dump_dict or 'entries' not in dump_dict:
             raise ValueError("Binder dictionary must contain 'entries' key")
 
         # create binder
-        binder = cls()
+        binder = cls(dump_dict['name'])
 
         # add entries to binder
         for entry in dump_dict['entries']:

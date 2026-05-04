@@ -22,10 +22,11 @@ class Deck(Binder):
     def __init__(self,
         max_card_copy_count: int = MAX_CARD_COPY_COUNT,
         max_card_count: int = MAX_CARD_COUNT,
+        name: str = "MTG Deck (Default)"
     ):
         self.max_card_copy_count = max_card_copy_count
         self.max_card_count = max_card_count
-        super().__init__()
+        super().__init__(name=name)
 
     # check if the deck is full
     def is_full(self) -> bool:
@@ -56,6 +57,7 @@ class Deck(Binder):
     # serialize deck to dictionary
     def to_dict(self) -> dict:
         return {
+            "name": self.name,
             "entries": [entry.to_dict() for entry in self.entries],
             "max_card_copy_count": self.max_card_copy_count,
             "max_card_count": self.max_card_count
@@ -64,11 +66,11 @@ class Deck(Binder):
     # deserialize deck from dictionary
     @classmethod
     def from_dict(cls, dump_dict: dict) -> 'Deck':
-        if 'entries' not in dump_dict or 'max_card_copy_count' not in dump_dict or 'max_card_count' not in dump_dict:
-            raise ValueError("Deck dictionary must contain 'entries', 'max_card_copy_count', and 'max_card_count' keys")
+        if 'name' not in dump_dict or 'entries' not in dump_dict or 'max_card_copy_count' not in dump_dict or 'max_card_count' not in dump_dict:
+            raise ValueError("Deck dictionary must contain 'name', 'entries', 'max_card_copy_count', and 'max_card_count' keys")
 
         # create deck
-        deck = cls(dump_dict['max_card_copy_count'], dump_dict['max_card_count'])
+        deck = cls(dump_dict['max_card_copy_count'], dump_dict['max_card_count'], dump_dict['name'])
 
         # add entries to deck
         for entry in dump_dict['entries']:
