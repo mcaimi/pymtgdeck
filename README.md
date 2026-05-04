@@ -7,7 +7,7 @@ Python library for maintaining **Magic: The Gathering** virtual binders and cons
 
 ## Project structure
 
-The package uses a **src layout** (importable code under `src/`), tests and fixtures beside the tree root, and **uv** for lockfile and dev dependencies.
+The package uses a **src layout** (importable code under `src/`), tests and fixtures beside the tree root, and **uv** for lockfile and dev dependencies. Domain types live under `entities/`; disk persistence under `persistence/`.
 
 ```text
 pymtgdeck/
@@ -17,15 +17,21 @@ pymtgdeck/
 ├── uv.lock                   # locked dependency versions (uv)
 ├── src/
 │   └── pymtgdeck/
-│       ├── __init__.py       # public exports: Entry, Binder, Deck
-│       ├── entry.py          # Entry (card + quantity)
-│       ├── binder.py         # Binder (unlimited collection semantics)
-│       └── deck.py           # Deck (subclass with size / copy limits)
+│       ├── __init__.py       # public exports: Entry, Binder, Deck, Registry, Backend
+│       ├── entities/
+│       │   ├── entry.py      # Entry (card + quantity)
+│       │   ├── binder.py     # Binder (unlimited collection semantics)
+│       │   └── deck.py       # Deck (subclass with size / copy limits)
+│       └── persistence/
+│           ├── backend.py    # save/load Deck and Binder to JSON files
+│           └── registry.py   # scan a folder of saved JSON and list metadata
 └── tests/
     ├── utils.py              # helpers: load Scryfall list JSON → first card
     ├── entry_test.py
     ├── binder_test.py
     ├── deck_test.py
+    ├── backend_test.py
+    ├── registry_test.py
     └── data/
         ├── card-example-1.json
         ├── card-example-2.json
@@ -34,7 +40,7 @@ pymtgdeck/
 
 ## Class diagram
 
-Relationships: a **Binder** holds a list of **Entry** instances; **Deck** subclasses **Binder** and adds validation and aggregate card counting. **ScryfallCard** comes from **pyscryfall**, not from pymtgdeck.
+Relationships: a **Binder** holds a list of **Entry** instances; **Deck** subclasses **Binder** and adds validation and aggregate card counting. **Backend** writes and reads JSON envelopes for **Deck** and **Binder**; **Registry** rescans a directory of those files for a lightweight index. **ScryfallCard** comes from **pyscryfall**, not from pymtgdeck.
 
 ```mermaid
 classDiagram
@@ -56,6 +62,7 @@ classDiagram
     }
 
     class Binder {
+        +str name
         +list entries
         +add_card(card, count=1)
         +has_card(card) bool
@@ -66,6 +73,7 @@ classDiagram
     }
 
     class Deck {
+        +str name
         +int max_card_copy_count
         +int max_card_count
         +is_full() bool
@@ -77,9 +85,25 @@ classDiagram
         +from_dict(data) Deck$
     }
 
+    class Backend {
+        +Path file_path
+        +save(obj) str
+        +load(file_name) Deck|Binder
+    }
+
+    class Registry {
+        +Path path
+        +list registry
+        +load_file(file_name) Deck|Binder
+    }
+
     Entry --> ScryfallCard : card
     Binder "1" o-- "*" Entry : entries
     Binder <|-- Deck
+    Backend ..> Deck : load/save
+    Backend ..> Binder : load/save
+    Registry ..> Deck : load_file
+    Registry ..> Binder : load_file
 ```
 
 **Note:** On **Deck**, `get_card_count()` (no arguments) returns the **total** number of cards in the deck. On **Binder**, `get_card_count(card)` returns copies of **that** card. Deck uses `get_card_copy_count(card)` for per-card counts.
@@ -108,7 +132,7 @@ Runtime dependency: `pyscryfall==0.1.2` (declared in `pyproject.toml`).
 from pyscryfall import search_cards_by_name
 from pymtgdeck import Binder
 
-binder = Binder()
+binder = Binder(name="Trade binder")  # name is optional; used in serialization and persistence
 results = search_cards_by_name("Sengir Vampire")
 card = results.data[0]
 
@@ -126,7 +150,7 @@ assert binder.get_card_count(card) == 1
 from pyscryfall import search_cards_by_name
 from pymtgdeck import Deck
 
-deck = Deck()  # or Deck(max_card_count=60, max_card_copy_count=4)
+deck = Deck(name="Sealed pool")  # or Deck(max_card_count=60, max_card_copy_count=4, name="...")
 results = search_cards_by_name("Forest")
 forest = results.data[0]
 
@@ -136,23 +160,53 @@ assert deck.get_card_copy_count(forest) == 4
 assert not deck.is_full()
 ```
 
+Default limits match the module constants `MAX_CARD_COUNT` and `MAX_CARD_COPY_COUNT` in `entities/deck.py` (40 and 4); you can override them per deck via the constructor.
+
 ### Serialization
+
+`Binder.to_dict()` / `Binder.from_dict()` include an optional `name` plus `entries`. `Deck.to_dict()` / `Deck.from_dict()` also persist `max_card_copy_count` and `max_card_count`.
 
 ```python
 from pymtgdeck import Binder, Deck
 
-binder = Binder()
+binder = Binder(name="My binder")
 # ... add cards ...
 
 dump = binder.to_dict()
 binder2 = Binder.from_dict(dump)
 
-deck = Deck()
+deck = Deck(name="My deck")
 # ... add cards ...
 
 deck_dump = deck.to_dict()
 deck2 = Deck.from_dict(deck_dump)
 ```
+
+### Persistence (`Backend`)
+
+`Backend` writes each deck or binder to a single JSON file under a configurable directory (default `~/.pymtgdeck`). The on-disk shape is an **envelope** with `timestamp`, `type` (`"Deck"` or `"Binder"`), `name` (same as the object’s `name`), and `data` (the result of `to_dict()` on the deck or binder).
+
+The file basename is the SHA-256 hex digest of the UTF-8 encoded `name`, with a `.json` suffix. Saving again for the same `name` raises `OSError` so you do not silently overwrite an existing file.
+
+```python
+from pymtgdeck import Deck, Backend
+from pathlib import Path
+
+store = Path("/tmp/mtg-store")
+backend = Backend(file_path=store)
+
+deck = Deck(name="FNM")
+# ... add cards ...
+
+filename = backend.save(deck)          # returns e.g. "<hex>.json"
+restored = backend.load(filename)
+```
+
+Use a non-`None` **`name`** on the deck or binder before `save`, so the filename is stable and hashing is defined.
+
+### Registry scan (`Registry`)
+
+`Registry` reads every `*.json` file in its directory (default `~/.pymtgdeck`). For each file whose envelope has `type` `"Deck"` or `"Binder"`, it records `name`, `type`, and `timestamp` in an in-memory list. `str(registry)` pretty-prints that index. For round-tripping files written by `Backend`, use `Backend.load` with the basename returned from `save`; `Registry` also exposes `load_file` for reloading (see `persistence/registry.py` for the exact argument semantics).
 
 ### Entry and JSON fixtures
 
@@ -192,7 +246,7 @@ pytest tests/deck_test.py     # single module
 pytest tests/ -k serialization  # tests whose name contains the substring
 ```
 
-The suite currently covers `Entry`, `Binder`, and `Deck` (add/remove, limits, serialization). Fixtures are offline JSON files; tests that call `search_cards_by_name` would need network access and are not part of the default suite.
+The suite covers `Entry`, `Binder`, and `Deck` (add/remove, limits, serialization, optional `name`), plus `Backend` save/load and collision behavior. Fixtures are offline JSON files; tests that call `search_cards_by_name` would need network access and are not part of the default suite.
 
 ## AI Disclosure
 
