@@ -193,3 +193,7 @@ pytest tests/ -k serialization  # tests whose name contains the substring
 ```
 
 The suite currently covers `Entry`, `Binder`, and `Deck` (add/remove, limits, serialization). Fixtures are offline JSON files; tests that call `search_cards_by_name` would need network access and are not part of the default suite.
+
+## AI Disclosure
+
+Part of this project has been developed with the help of an AI Model. Specifically I used a locally-hosted [QWEN3-CODER](https://ollama.com/library/qwen3-coder) using [Ollama](https://ollama.ai).
