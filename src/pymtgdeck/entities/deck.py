@@ -5,12 +5,14 @@
 try:
     from .entry import Entry    
     from .binder import Binder
+    from .types import BASIC_LAND_NAMES
     from pyscryfall import ScryfallCard
 except ImportError as e:
     print(f"Error importing library: {e}")
 
 # Maximum number of copies of a card that can be present in a deck.
 MAX_CARD_COPY_COUNT = 4
+
 # Maximum number of cards that can be present in a deck.
 MAX_CARD_COUNT = 40
 
@@ -48,6 +50,12 @@ class Deck(Binder):
     # If the card is not in the deck, add it to the deck.
     # If the deck is full, raise a ValueError.
     def add_card(self, card: ScryfallCard, count: int = 1):
+        # check if card type is in the exception list (basic lands)
+        if card.name.lower() in [land.lower() for land in BASIC_LAND_NAMES]:
+            super().add_card(card, count)
+            return
+        
+        # check if card is already in the deck
         if self.get_card_copy_count(card) + count > self.max_card_copy_count:
             raise ValueError(f"Card {card.name} cannot be present more than {self.max_card_copy_count} times in the deck")
         if self.get_card_count() >= self.max_card_count:
