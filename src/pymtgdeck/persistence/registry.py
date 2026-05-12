@@ -26,10 +26,10 @@ class Registry:
         self.path.mkdir(parents=True, exist_ok=True)
         self._load_registry()
 
-    # look into self.path and glob all json files
+    # recursively look into self.path and glob all json files
     # for each file found, add it to the registry if it is a Deck or Binder
     def _load_registry(self) -> None:
-        for file in self.path.glob('*.json'):
+        for file in self.path.rglob('*.json'):
             if file.is_file():
                 with open(file, 'r') as f:
                     data = json.load(f)
@@ -37,7 +37,8 @@ class Registry:
                         self.registry.append({
                             'name': data['name'],
                             'type': data['type'],
-                            'timestamp': data['timestamp']
+                            'timestamp': data['timestamp'],
+                            'path': file,
                         })
                     # unload the file from memory
                     del data
