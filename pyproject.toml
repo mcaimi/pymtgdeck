@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pymtgdeck"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python library that helps maintaining Magic: The Gathering Decks and Virtual Binders"
 readme = "README.md"
 license = {text = "GNU General Public License v3.0"}
