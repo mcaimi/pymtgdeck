@@ -5,7 +5,7 @@
 try:
     from .entry import Entry    
     from .binder import Binder
-    from .types import BASIC_LAND_NAMES
+    from .types import is_basic_land
     from pyscryfall import ScryfallCard
 except ImportError as e:
     print(f"Error importing library: {e}")
@@ -51,7 +51,7 @@ class Deck(Binder):
     # If the deck is full, raise a ValueError.
     def add_card(self, card: ScryfallCard, count: int = 1):
         # check if card type is in the exception list (basic lands)
-        if card.name.lower() in [land.lower() for land in BASIC_LAND_NAMES]:
+        if is_basic_land(card):
             super().add_card(card, count)
             return
         
