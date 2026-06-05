@@ -4,12 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pymtgdeck"
-version = "0.1.1"
+version = "0.1.2"
 description = "Python library that helps maintaining Magic: The Gathering Decks and Virtual Binders"
 readme = "README.md"
 license = {text = "GNU General Public License v3.0"}
 requires-python = ">=3.12"
 dependencies = [
+    "numpy>=2.4.6",
     "pyscryfall==0.1.2",
 ]
 

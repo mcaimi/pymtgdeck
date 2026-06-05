@@ -17,11 +17,13 @@ pymtgdeck/
 ├── uv.lock                   # locked dependency versions (uv)
 ├── src/
 │   └── pymtgdeck/
-│       ├── __init__.py       # public exports: Entry, Binder, Deck, Registry, Backend
+│       ├── __init__.py       # public exports (Entry, Binder, Deck, analytics, persistence)
 │       ├── entities/
 │       │   ├── entry.py      # Entry (card + quantity)
 │       │   ├── binder.py     # Binder (unlimited collection semantics)
-│       │   └── deck.py       # Deck (subclass with size / copy limits)
+│       │   ├── deck.py       # Deck (subclass with size / copy limits)
+│       │   ├── types.py      # MTG helpers (e.g. is_basic_land)
+│       │   └── analytics.py  # deck CMC stats (numpy)
 │       └── persistence/
 │           ├── backend.py    # save/load Deck and Binder to JSON files
 │           └── registry.py   # scan a folder of saved JSON and list metadata
@@ -32,6 +34,7 @@ pymtgdeck/
     ├── deck_test.py
     ├── backend_test.py
     ├── registry_test.py
+    ├── analytics_test.py
     └── data/
         ├── card-example-1.json
         ├── card-example-2.json
@@ -40,7 +43,7 @@ pymtgdeck/
 
 ## Class diagram
 
-Relationships: a **Binder** holds a list of **Entry** instances; **Deck** subclasses **Binder** and adds validation and aggregate card counting. **Backend** writes and reads JSON envelopes for **Deck** and **Binder**; **Registry** rescans a directory of those files for a lightweight index. **ScryfallCard** comes from **pyscryfall**, not from pymtgdeck.
+Relationships: a **Binder** holds a list of **Entry** instances; **Deck** subclasses **Binder** and adds validation and aggregate card counting. **Analytics** (`entities/analytics.py`) exposes module-level CMC helpers that take a **Deck** and use **Types** to skip basic lands. **Backend** writes and reads JSON envelopes for **Deck** and **Binder**; **Registry** rescans a directory of those files for a lightweight index. **ScryfallCard** comes from **pyscryfall**, not from pymtgdeck.
 
 ```mermaid
 classDiagram
@@ -97,6 +100,24 @@ classDiagram
         +load_file(file_name) Deck|Binder
     }
 
+    class Types {
+        <<module>>
+        +is_basic_land(card) bool$
+        +BASIC_LAND_NAMES list
+    }
+
+    class Analytics {
+        <<module>>
+        +deck_min_cmc(deck) int$
+        +deck_max_cmc(deck) int$
+        +deck_cmc_distribution(deck) tuple$
+        +deck_cmc_histogram(deck) tuple$
+    }
+
+    class Numpy {
+        <<numpy>>
+    }
+
     Entry --> ScryfallCard : card
     Binder "1" o-- "*" Entry : entries
     Binder <|-- Deck
@@ -104,9 +125,16 @@ classDiagram
     Backend ..> Binder : load/save
     Registry ..> Deck : load_file
     Registry ..> Binder : load_file
+    Analytics ..> Deck : CMC stats
+    Analytics ..> Types : exclude basic lands
+    Analytics ..> Numpy : bincount, histogram
+    Types ..> ScryfallCard : card.name
 ```
 
-**Note:** On **Deck**, `get_card_count()` (no arguments) returns the **total** number of cards in the deck. On **Binder**, `get_card_count(card)` returns copies of **that** card. Deck uses `get_card_copy_count(card)` for per-card counts.
+**Notes:**
+
+- On **Deck**, `get_card_count()` (no arguments) returns the **total** number of cards in the deck. On **Binder**, `get_card_count(card)` returns copies of **that** card. Deck uses `get_card_copy_count(card)` for per-card counts.
+- **Analytics** functions are exported from `pymtgdeck` but are not methods on **Deck**; they count one CMC per **Entry** (not per copy). See [Deck analytics (CMC)](#deck-analytics-cmc).
 
 ## Installation
 
@@ -122,7 +150,7 @@ Or install the package in editable mode with your preferred tool (example with p
 pip install -e .
 ```
 
-Runtime dependency: `pyscryfall==0.1.2` (declared in `pyproject.toml`).
+Runtime dependencies: `pyscryfall==0.1.2` and `numpy>=2.4.6` (declared in `pyproject.toml`).
 
 ## Usage examples
 
@@ -222,6 +250,29 @@ restored = Entry.from_dict(data)
 
 Tests load cards from files shaped like Scryfall’s **card list** response (see `tests/data/*.json`), using `ScryfallCardList.from_json_string` and taking `data[0]`.
 
+### Deck analytics (CMC)
+
+Analytics helpers live in `entities/analytics.py` and are exported from the package root. They inspect a `Deck`’s **entries** (one row per distinct card), use each card’s integer **CMC** (`int(entry.card.cmc)`), and **exclude basic lands** (Island, Plains, Swamp, Mountain, Forest) via `is_basic_land` in `entities/types.py`. Copy counts (`Entry.count`) do not change the distribution—only whether a non–basic-land card appears in the deck.
+
+| Function | Role |
+|----------|------|
+| `deck_min_cmc(deck)` | Lowest CMC among non–basic-land entries |
+| `deck_max_cmc(deck)` | Highest CMC among non–basic-land entries |
+| `deck_cmc_distribution(deck)` | `(counts, bin_edges)` — per-entry counts per CMC bucket (`numpy.bincount` shape) |
+| `deck_cmc_histogram(deck)` | Histogram over the distribution buckets (`numpy.histogram` shape) |
+
+An empty deck (or one with only basic lands) yields empty arrays from the distribution/histogram helpers. `deck_min_cmc` / `deck_max_cmc` raise `ValueError` when there is no qualifying entry.
+
+```python
+from pymtgdeck import Deck, deck_cmc_distribution, deck_max_cmc, deck_min_cmc
+
+deck = Deck(name="Curve check")
+# ... add cards ...
+
+low, high = deck_min_cmc(deck), deck_max_cmc(deck)
+counts, bin_edges = deck_cmc_distribution(deck)
+```
+
 ## Test procedure
 
 Tests use **pytest** (dev dependency). Configuration lives in `pyproject.toml` under `[tool.pytest.ini_options]` (`testpaths = ["tests"]`, `pythonpath = ["."]` so `src` resolves when running from the repo root).
@@ -246,7 +297,7 @@ pytest tests/deck_test.py     # single module
 pytest tests/ -k serialization  # tests whose name contains the substring
 ```
 
-The suite covers `Entry`, `Binder`, and `Deck` (add/remove, limits, serialization, optional `name`), plus `Backend` save/load and collision behavior. Fixtures are offline JSON files; tests that call `search_cards_by_name` would need network access and are not part of the default suite.
+The suite covers `Entry`, `Binder`, and `Deck` (add/remove, limits, serialization, optional `name`), `Backend` save/load and collision behavior, and deck CMC analytics (`analytics_test.py`). Fixtures are offline JSON files; tests that call `search_cards_by_name` would need network access and are not part of the default suite.
 
 ## AI Disclosure
 
