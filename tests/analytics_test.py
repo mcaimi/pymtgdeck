@@ -25,14 +25,14 @@ def test_deck_cmc_distribution_empty():
     deck = Deck()
     counts, bin_edges = deck_cmc_distribution(deck)
     assert np.array_equal(counts, np.array([], dtype=int))
-    assert np.array_equal(bin_edges, np.array([], dtype=int))
+    assert np.array_equal(bin_edges, np.array([0], dtype=int))
 
 
 def test_deck_cmc_distribution_one_count_per_entry():
     deck = _deck_with_mixed_cmc_entries()
     counts, bin_edges = deck_cmc_distribution(deck)
     assert np.array_equal(counts, np.array([0, 0, 1, 0, 0, 1], dtype=int))
-    assert np.array_equal(bin_edges, np.array([0, 1, 2, 3, 4, 5], dtype=int))
+    assert np.array_equal(bin_edges, np.array([0, 1, 2, 3, 4, 5, 6], dtype=int))
 
 
 def test_deck_cmc_distribution_ignores_copy_count():
@@ -49,7 +49,7 @@ def test_deck_cmc_distribution_single_bucket():
     deck.add_card(card)
     counts, bin_edges = deck_cmc_distribution(deck)
     assert np.array_equal(counts, np.array([0, 0, 1], dtype=int))
-    assert np.array_equal(bin_edges, np.array([0, 1, 2], dtype=int))
+    assert np.array_equal(bin_edges, np.array([0, 1, 2, 3], dtype=int))
 
 
 def test_deck_cmc_distribution_truncates_fractional_cmc():
@@ -59,7 +59,7 @@ def test_deck_cmc_distribution_truncates_fractional_cmc():
     deck.add_card(card, 2)
     counts, bin_edges = deck_cmc_distribution(deck)
     assert np.array_equal(counts, np.array([0, 0, 1], dtype=int))
-    assert np.array_equal(bin_edges, np.array([0, 1, 2], dtype=int))
+    assert np.array_equal(bin_edges, np.array([0, 1, 2, 3], dtype=int))
 
 
 def test_deck_cmc_histogram_empty():
@@ -72,8 +72,8 @@ def test_deck_cmc_histogram_empty():
 def test_deck_cmc_histogram_from_distribution():
     deck = _deck_with_mixed_cmc_entries()
     counts, bin_edges = deck_cmc_histogram(deck)
-    assert np.array_equal(counts, np.array([4, 2, 0, 0, 0], dtype=int))
-    assert np.array_equal(bin_edges, np.array([0, 1, 2, 3, 4, 5], dtype=int))
+    assert np.array_equal(counts, np.array([0, 0, 1, 0, 0, 1], dtype=int))
+    assert np.array_equal(bin_edges, np.array([0, 1, 2, 3, 4, 5, 6], dtype=int))
 
 
 def test_deck_cmc_histogram_single_bucket():
@@ -81,8 +81,8 @@ def test_deck_cmc_histogram_single_bucket():
     card = _load_card_from_json_file(DATA_DIR / "card-example-3.json")
     deck.add_card(card)
     counts, bin_edges = deck_cmc_histogram(deck)
-    assert np.array_equal(counts, np.array([2, 1], dtype=int))
-    assert np.array_equal(bin_edges, np.array([0, 1, 2], dtype=int))
+    assert np.array_equal(counts, np.array([0, 0, 1], dtype=int))
+    assert np.array_equal(bin_edges, np.array([0, 1, 2, 3], dtype=int))
 
 
 def test_deck_min_max_cmc():

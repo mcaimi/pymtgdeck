@@ -35,15 +35,19 @@ def deck_cmc_distribution(deck: Deck) -> tuple[np.ndarray, np.ndarray]:
     Returns a tuple of counts and bin edges, in the same shape as :func:`numpy.histogram`.
     """
     buckets = np.bincount(_deck_cmc_values(deck))
-    return buckets, np.arange(len(buckets))
+    return buckets, np.arange(len(buckets) + 1)
 
 # build a histogram of CMC values, ignoring basic lands
-def deck_cmc_histogram(deck: Deck) -> np.histogram:
+def deck_cmc_histogram(deck: Deck) -> tuple[np.ndarray, np.ndarray]:
     """Build a histogram of card counts by converted mana cost (CMC).
 
     Returns a tuple of counts and bin edges, in the same shape as :func:`numpy.histogram`.
     """
-    counts, bin_edges = deck_cmc_distribution(deck)
-    return np.histogram(counts, bins=bin_edges) 
+    cmc_values = _deck_cmc_values(deck)
+    if len(cmc_values) == 0:
+        return np.array([], dtype=int), np.array([], dtype=int)
+    max_cmc = int(cmc_values.max())
+    bins = np.arange(max_cmc + 2)
+    return np.histogram(cmc_values, bins=bins) 
 
 __all__ = ["deck_cmc_distribution", "deck_cmc_histogram", "deck_max_cmc", "deck_min_cmc"]
