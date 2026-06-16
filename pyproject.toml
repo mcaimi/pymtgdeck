@@ -11,7 +11,7 @@ license = {text = "GNU General Public License v3.0"}
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.4.6",
-    "pyscryfall==0.1.2",
+    "pyscryfall==0.2.0",
 ]
 
 classifiers = [
