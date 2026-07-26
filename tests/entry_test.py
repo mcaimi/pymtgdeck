@@ -24,6 +24,19 @@ def test_entry_serialization():
     assert dict['card']['name'] == 'Sengir Vampire'
     assert dict['count'] == 1
 
+# test deserialization via classmethod
+def test_entry_deserialization():
+    card = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')
+    entry = Entry(card, 3)
+    entry2 = Entry.from_dict(entry.to_dict())
+    assert entry2 == entry
+
+def test_entry_from_json():
+    card = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')
+    entry = Entry(card, 2)
+    entry2 = Entry.from_json(entry.to_json())
+    assert entry2 == entry
+
 # test equality
 def test_entry_equality():
     # load a ScryfallCardList from a json file

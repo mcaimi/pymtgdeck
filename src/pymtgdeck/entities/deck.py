@@ -50,17 +50,29 @@ class Deck(Binder):
     # If the card is not in the deck, add it to the deck.
     # If the deck is full, raise a ValueError.
     def add_card(self, card: ScryfallCard, count: int = 1):
-        # check if card type is in the exception list (basic lands)
-        if is_basic_land(card):
-            super().add_card(card, count)
-            return
-        
-        # check if card is already in the deck
-        if self.get_card_copy_count(card) + count > self.max_card_copy_count:
-            raise ValueError(f"Card {card.name} cannot be present more than {self.max_card_copy_count} times in the deck")
-        if self.get_card_count() >= self.max_card_count:
+        # total-card limit applies to all cards, including basic lands
+        if self.get_card_count() + count > self.max_card_count:
             raise ValueError(f"Deck cannot contain more than {self.max_card_count} cards")
+        # basic lands are exempt from the per-card copy limit
+        if not is_basic_land(card):
+            if self.get_card_copy_count(card) + count > self.max_card_copy_count:
+                raise ValueError(f"Card {card.name} cannot be present more than {self.max_card_copy_count} times in the deck")
         super().add_card(card, count)
+
+    @classmethod
+    def standard(cls, name: str = "MTG Standard Deck") -> 'Deck':
+        """60-card deck, max 4 copies of any non-basic-land card."""
+        return cls(max_card_copy_count=4, max_card_count=60, name=name)
+
+    @classmethod
+    def limited(cls, name: str = "MTG Limited Deck") -> 'Deck':
+        """40-card deck, max 4 copies of any non-basic-land card."""
+        return cls(max_card_copy_count=4, max_card_count=40, name=name)
+
+    @classmethod
+    def commander(cls, name: str = "MTG Commander Deck") -> 'Deck':
+        """100-card singleton deck (max 1 copy per non-basic-land card)."""
+        return cls(max_card_copy_count=1, max_card_count=100, name=name)
 
     # serialize deck to dictionary
     def to_dict(self) -> dict:
@@ -82,7 +94,8 @@ class Deck(Binder):
 
         # add entries to deck
         for entry in dump_dict['entries']:
-            deck.add_card(Entry.from_dict(entry).card, Entry.from_dict(entry).count)
+            e = Entry.from_dict(entry)
+            deck.add_card(e.card, e.count)
 
         return deck
     

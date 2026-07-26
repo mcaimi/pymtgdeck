@@ -17,7 +17,9 @@ except ImportError as e:
 # test backend save and load
 def test_backend_save_and_load():
     tmp_dir = Path('/tmp/pymtgdeck_test')
-    tmp_dir.mkdir(parents=True, exist_ok=True)
+    if tmp_dir.exists():
+        shutil.rmtree(tmp_dir)
+    tmp_dir.mkdir(parents=True)
 
     # create a temporary directory
     # load cards
@@ -35,7 +37,8 @@ def test_backend_save_and_load():
     backend = Backend(file_path=tmp_dir)
 
     # save deck
-    file_name = backend.save(deck)
+    deck_file_name = backend.save(deck)
+    file_name = deck_file_name
     assert file_name == f'{hashlib.sha256(deck.name.encode()).hexdigest()}.json'
 
     # load deck
@@ -67,6 +70,16 @@ def test_backend_save_and_load():
     # try to save binder again, should raise a OSError
     with pytest.raises(OSError):
         backend.save(binder)
+
+    # overwrite=True must succeed and preserve the same filename
+    deck.add_card(card3)
+    overwrite_file_name = backend.save(deck, overwrite=True)
+    assert overwrite_file_name == deck_file_name  # same hash → same filename
+
+    # verify overwritten data round-trips correctly
+    deck_reloaded = backend.load(overwrite_file_name)
+    assert deck_reloaded.name == deck.name
+    assert deck_reloaded.entries == deck.entries
 
     # remove temporary directory, even if it is not empty
     shutil.rmtree(tmp_dir)

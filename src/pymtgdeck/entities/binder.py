@@ -69,9 +69,44 @@ class Binder:
 
         # add entries to binder
         for entry in dump_dict['entries']:
-            binder.add_card(Entry.from_dict(entry).card, Entry.from_dict(entry).count)
+            e = Entry.from_dict(entry)
+            binder.add_card(e.card, e.count)
 
         return binder
+
+    def search(
+        self,
+        *,
+        name: str | None = None,
+        card_type: str | None = None,
+        cmc_min: int | None = None,
+        cmc_max: int | None = None,
+        color: str | None = None,
+    ) -> list:
+        """Return entries matching all provided filters (AND logic).
+
+        - name: case-insensitive substring match on card name
+        - card_type: case-insensitive substring match on type_line
+        - cmc_min / cmc_max: integer CMC range (inclusive)
+        - color: single color letter (W/U/B/R/G) must be in card.colors
+        """
+        results = []
+        for entry in self.entries:
+            card = entry.card
+            if name is not None and name.lower() not in (card.name or "").lower():
+                continue
+            if card_type is not None and card_type.lower() not in (card.type_line or "").lower():
+                continue
+            cmc = int(card.cmc or 0)
+            if cmc_min is not None and cmc < cmc_min:
+                continue
+            if cmc_max is not None and cmc > cmc_max:
+                continue
+            if color is not None:
+                if color.upper() not in [c.upper() for c in (card.colors or [])]:
+                    continue
+            results.append(entry)
+        return results
 
 # export the Binder class
 __all__ = ['Binder']

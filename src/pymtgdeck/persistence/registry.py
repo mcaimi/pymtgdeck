@@ -6,7 +6,7 @@
 # the file contents are the Deck or Binder in json format
 
 try:
-    from pymtgdeck import Deck, Binder
+    from pymtgdeck import Deck, Binder, Sideboard
     import typing
     import json
     from pathlib import Path
@@ -33,7 +33,7 @@ class Registry:
             if file.is_file():
                 with open(file, 'r') as f:
                     data = json.load(f)
-                    if data['type'] == 'Deck' or data['type'] == 'Binder':
+                    if data['type'] in ('Deck', 'Binder', 'Sideboard'):
                         self.registry.append({
                             'name': data['name'],
                             'type': data['type'],
@@ -43,22 +43,22 @@ class Registry:
                     # unload the file from memory
                     del data
 
-    # load the specified file from the registry into a Deck or Binder object
-    def load_file(self, file_name: str) -> typing.Union[Deck, Binder]:
-        # check if the file is in the registry
-        if file_name not in [entry['name'] for entry in self.registry]:
-            raise ValueError(f"File {file_name} not found in registry")
-
-        # load the file from the registry
-        with open(self.path / file_name, 'r') as f:
-            data = json.load(f)
-            match data['type']:
-                case 'Deck':
-                    return Deck.from_dict(data['data'])
-                case 'Binder':
-                    return Binder.from_dict(data['data'])
-                case _:
-                    raise ValueError(f"Unknown type: {data['type']}")
+    # load a Deck or Binder by its name from the registry
+    def load_file(self, name: str) -> typing.Union[Deck, Binder]:
+        for entry in self.registry:
+            if entry['name'] == name:
+                with open(entry['path'], 'r') as f:
+                    data = json.load(f)
+                    match data['type']:
+                        case 'Deck':
+                            return Deck.from_dict(data['data'])
+                        case 'Binder':
+                            return Binder.from_dict(data['data'])
+                        case 'Sideboard':
+                            return Sideboard.from_dict(data['data'])
+                        case _:
+                            raise ValueError(f"Unknown type: {data['type']}")
+        raise ValueError(f"'{name}' not found in registry")
 
     # pretty print the registry
     def __str__(self) -> str:

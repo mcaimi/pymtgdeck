@@ -7,7 +7,7 @@ try:
     import json
     import time
     import typing
-    from pymtgdeck import Deck, Binder
+    from pymtgdeck import Deck, Binder, Sideboard
     from pathlib import Path
 except ImportError as e:
     print(f"Error: {e}")
@@ -25,7 +25,7 @@ class Backend:
     # save a Deck or Binder to disk
     # the file name is the hash of the Deck or Binder
     # the file contents are the Deck or Binder in json format plus a timestamp and a field to indicate the type of the object
-    def save(self, obj: typing.Union[Deck, Binder]) -> str:
+    def save(self, obj: typing.Union[Deck, Binder, Sideboard], overwrite: bool = False) -> str:
         data = {
             'timestamp': time.time(),
             'type': type(obj).__name__,
@@ -36,8 +36,8 @@ class Backend:
         # build file name from hash. same deck name, same file name.
         file_name = f'{hashlib.sha256(data['name'].encode()).hexdigest()}.json'
 
-        # check if file already exists, if so raise a OSError
-        if (self.file_path / file_name).exists():
+        # check if file already exists; raise unless caller opted into overwrite
+        if (self.file_path / file_name).exists() and not overwrite:
             raise OSError(f"File {file_name} already exists")
 
         # save data to file
@@ -48,7 +48,7 @@ class Backend:
     # load a Deck or Binder from disk
     # the file name is the hash of the Deck or Binder
     # the file contents are the Deck or Binder in json format plus a timestamp and a field to indicate the type of the object
-    def load(self, file_name: str) -> typing.Union[Deck, Binder]:
+    def load(self, file_name: str) -> typing.Union[Deck, Binder, Sideboard]:
         with open(self.file_path / file_name, 'r') as f:
             data = json.load(f)
             match data['type']:
@@ -56,6 +56,8 @@ class Backend:
                     return Deck.from_dict(data['data'])
                 case 'Binder':
                     return Binder.from_dict(data['data'])
+                case 'Sideboard':
+                    return Sideboard.from_dict(data['data'])
                 case _:
                     raise ValueError(f"Unknown type: {data['type']}")
 
