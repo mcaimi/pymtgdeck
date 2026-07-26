@@ -30,10 +30,18 @@ MODIFIERS: list[str] = [
 def is_basic_land(card: ScryfallCard) -> bool:
     return card.name.lower() in [land.lower() for land in BASIC_LAND_NAMES]
 
+LEGAL_FORMATS: list[str] = [
+    "standard", "future", "historic", "timeless", "gladiator",
+    "pioneer", "modern", "legacy", "pauper", "vintage", "penny",
+    "commander", "oathbreaker", "standardbrawl", "brawl", "alchemy",
+    "paupercommander", "duel", "oldschool", "premodern", "predh", "tlr",
+]
+
 # export the constants
 __all__ = [
     "CARD_TYPES",
     "BASIC_LAND_NAMES",
     "MODIFIERS",
-    "is_basic_land"
+    "LEGAL_FORMATS",
+    "is_basic_land",
 ]

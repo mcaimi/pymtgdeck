@@ -6,7 +6,7 @@
 # the file contents are the Deck or Binder in json format
 
 try:
-    from pymtgdeck import Deck, Binder
+    from pymtgdeck import Deck, Binder, Sideboard
     import typing
     import json
     from pathlib import Path
@@ -33,7 +33,7 @@ class Registry:
             if file.is_file():
                 with open(file, 'r') as f:
                     data = json.load(f)
-                    if data['type'] == 'Deck' or data['type'] == 'Binder':
+                    if data['type'] in ('Deck', 'Binder', 'Sideboard'):
                         self.registry.append({
                             'name': data['name'],
                             'type': data['type'],
@@ -54,6 +54,8 @@ class Registry:
                             return Deck.from_dict(data['data'])
                         case 'Binder':
                             return Binder.from_dict(data['data'])
+                        case 'Sideboard':
+                            return Sideboard.from_dict(data['data'])
                         case _:
                             raise ValueError(f"Unknown type: {data['type']}")
         raise ValueError(f"'{name}' not found in registry")

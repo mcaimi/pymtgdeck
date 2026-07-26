@@ -50,16 +50,13 @@ class Deck(Binder):
     # If the card is not in the deck, add it to the deck.
     # If the deck is full, raise a ValueError.
     def add_card(self, card: ScryfallCard, count: int = 1):
-        # check if card type is in the exception list (basic lands)
-        if is_basic_land(card):
-            super().add_card(card, count)
-            return
-        
-        # check if card is already in the deck
-        if self.get_card_copy_count(card) + count > self.max_card_copy_count:
-            raise ValueError(f"Card {card.name} cannot be present more than {self.max_card_copy_count} times in the deck")
-        if self.get_card_count() >= self.max_card_count:
+        # total-card limit applies to all cards, including basic lands
+        if self.get_card_count() + count > self.max_card_count:
             raise ValueError(f"Deck cannot contain more than {self.max_card_count} cards")
+        # basic lands are exempt from the per-card copy limit
+        if not is_basic_land(card):
+            if self.get_card_copy_count(card) + count > self.max_card_copy_count:
+                raise ValueError(f"Card {card.name} cannot be present more than {self.max_card_copy_count} times in the deck")
         super().add_card(card, count)
 
     @classmethod

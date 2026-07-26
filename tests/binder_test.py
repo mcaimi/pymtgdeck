@@ -155,3 +155,76 @@ def test_binder_deserialization():
     # deserialize binder
     binder2 = Binder.from_dict(binder.to_dict())
     assert binder2.entries == binder.entries
+
+
+# ---------------------------------------------------------------------------
+# Binder.search
+# ---------------------------------------------------------------------------
+
+def test_binder_search_by_name():
+    binder = Binder()
+    card1 = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')  # Sengir Vampire
+    card2 = _load_card_from_json_file(DATA_DIR / 'card-example-3.json')  # Counterspell
+    binder.add_card(card1)
+    binder.add_card(card2)
+    results = binder.search(name="Sengir")
+    assert len(results) == 1
+    assert results[0].card.name == "Sengir Vampire"
+
+
+def test_binder_search_by_card_type():
+    binder = Binder()
+    card1 = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')  # Creature
+    card2 = _load_card_from_json_file(DATA_DIR / 'card-example-3.json')  # Instant
+    binder.add_card(card1)
+    binder.add_card(card2)
+    creatures = binder.search(card_type="Creature")
+    assert len(creatures) == 1
+    assert creatures[0].card.name == "Sengir Vampire"
+
+
+def test_binder_search_by_cmc_range():
+    binder = Binder()
+    card_cmc5 = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')  # CMC 5
+    card_cmc2 = _load_card_from_json_file(DATA_DIR / 'card-example-3.json')  # CMC 2
+    binder.add_card(card_cmc5)
+    binder.add_card(card_cmc2)
+    low = binder.search(cmc_max=3)
+    assert len(low) == 1
+    assert low[0].card.name == "Counterspell"
+    high = binder.search(cmc_min=4)
+    assert len(high) == 1
+    assert high[0].card.name == "Sengir Vampire"
+
+
+def test_binder_search_by_color():
+    binder = Binder()
+    card_black = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')  # Black
+    card_blue = _load_card_from_json_file(DATA_DIR / 'card-example-3.json')   # Blue
+    binder.add_card(card_black)
+    binder.add_card(card_blue)
+    blue_cards = binder.search(color="U")
+    assert len(blue_cards) == 1
+    assert blue_cards[0].card.name == "Counterspell"
+
+
+def test_binder_search_combined_filters():
+    binder = Binder()
+    card1 = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')  # Creature, CMC 5, Black
+    card2 = _load_card_from_json_file(DATA_DIR / 'card-example-3.json')  # Instant, CMC 2, Blue
+    binder.add_card(card1)
+    binder.add_card(card2)
+    results = binder.search(card_type="Instant", cmc_max=3)
+    assert len(results) == 1
+    assert results[0].card.name == "Counterspell"
+
+
+def test_binder_search_no_match():
+    binder = Binder()
+    card = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')
+    binder.add_card(card)
+    assert binder.search(name="Nonexistent Card") == []
+
+
+def test_binder_search_empty_binder():
+    assert Binder().search(name="anything") == []
