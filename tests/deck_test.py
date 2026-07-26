@@ -151,6 +151,34 @@ def test_deck_is_full():
     assert deck.is_full() == False
     assert deck.is_empty() == True
 
+# test format preset factories
+def test_deck_standard_preset():
+    deck = Deck.standard(name="My Standard")
+    assert deck.name == "My Standard"
+    assert deck.max_card_count == 60
+    assert deck.max_card_copy_count == 4
+
+
+def test_deck_limited_preset():
+    deck = Deck.limited(name="My Limited")
+    assert deck.name == "My Limited"
+    assert deck.max_card_count == 40
+    assert deck.max_card_copy_count == 4
+
+
+def test_deck_commander_preset():
+    deck = Deck.commander(name="My Commander")
+    assert deck.name == "My Commander"
+    assert deck.max_card_count == 100
+    assert deck.max_card_copy_count == 1
+
+    # singleton: adding a second copy of a non-basic-land card must fail
+    card = _load_card_from_json_file(DATA_DIR / 'card-example-1.json')
+    deck.add_card(card)
+    with pytest.raises(ValueError):
+        deck.add_card(card)
+
+
 # test serialization
 def test_deck_serialization():
     # create a Deck object

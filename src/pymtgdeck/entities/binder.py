@@ -69,7 +69,8 @@ class Binder:
 
         # add entries to binder
         for entry in dump_dict['entries']:
-            binder.add_card(Entry.from_dict(entry).card, Entry.from_dict(entry).count)
+            e = Entry.from_dict(entry)
+            binder.add_card(e.card, e.count)
 
         return binder
 

@@ -25,12 +25,14 @@ class Entry:
         return json.dumps(self.to_dict())
     
     # entry from dictionary
-    def from_dict(dict: dict) -> 'Entry':
-        return Entry(ScryfallCard.from_dict(dict['card']), dict['count'])
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Entry':
+        return cls(ScryfallCard.from_dict(data['card']), data['count'])
 
     # entry from json
-    def from_json(json: str) -> 'Entry':
-        return Entry.from_dict(json.loads(json))
+    @classmethod
+    def from_json(cls, json_str: str) -> 'Entry':
+        return cls.from_dict(json.loads(json_str))
 
     # entry to string
     def __str__(self):
