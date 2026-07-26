@@ -1,13 +1,13 @@
 # pymtgdeck
 
-Python library for maintaining **Magic: The Gathering** virtual binders and constrained decks. Card data is represented with [pyscryfall](https://pypi.org/project/pyscryfall/) `ScryfallCard` objects (Scryfall-shaped JSON in and out).
+Python library for maintaining **Magic: The Gathering** virtual binders, constrained decks, and sideboards. Card data is represented with [pyscryfall](https://pypi.org/project/pyscryfall/) `ScryfallCard` objects (Scryfall-shaped JSON in and out).
 
 - **License:** GNU General Public License v3.0 (see `LICENSE`)
 - **Python:** 3.12+
 
 ## Project structure
 
-The package uses a **src layout** (importable code under `src/`), tests and fixtures beside the tree root, and **uv** for lockfile and dev dependencies. Domain types live under `entities/`; disk persistence under `persistence/`.
+The package uses a **src layout** (importable code under `src/`), tests and fixtures beside the tree root, and **uv** for lockfile and dev dependencies. Domain types live under `entities/`; disk persistence under `persistence/`; text I/O in `io.py`.
 
 ```text
 pymtgdeck/
@@ -17,33 +17,37 @@ pymtgdeck/
 ├── uv.lock                   # locked dependency versions (uv)
 ├── src/
 │   └── pymtgdeck/
-│       ├── __init__.py       # public exports (Entry, Binder, Deck, analytics, persistence)
+│       ├── __init__.py       # public exports
+│       ├── io.py             # deck_to_text / deck_from_text (plain-text format)
 │       ├── entities/
 │       │   ├── entry.py      # Entry (card + quantity)
 │       │   ├── binder.py     # Binder (unlimited collection semantics)
 │       │   ├── deck.py       # Deck (subclass with size / copy limits)
-│       │   ├── types.py      # MTG helpers (e.g. is_basic_land)
-│       │   └── analytics.py  # deck CMC stats (numpy)
+│       │   ├── sideboard.py  # Sideboard (Deck subclass, fixed 15-card limit)
+│       │   ├── types.py      # MTG helpers (is_basic_land, CARD_TYPES, LEGAL_FORMATS, …)
+│       │   └── analytics.py  # deck analytics (CMC, type/color distribution, legality, diff, mana base)
 │       └── persistence/
-│           ├── backend.py    # save/load Deck and Binder to JSON files
+│           ├── backend.py    # save/load Deck, Binder, and Sideboard to JSON files
 │           └── registry.py   # scan a folder of saved JSON and list metadata
 └── tests/
     ├── utils.py              # helpers: load Scryfall list JSON → first card
     ├── entry_test.py
     ├── binder_test.py
     ├── deck_test.py
+    ├── sideboard_test.py
     ├── backend_test.py
     ├── registry_test.py
     ├── analytics_test.py
+    ├── io_test.py
     └── data/
         ├── card-example-1.json
         ├── card-example-2.json
-        └── card-example-3.json   # Scryfall API “list” JSON fixtures
+        └── card-example-3.json   # Scryfall API "list" JSON fixtures
 ```
 
 ## Class diagram
 
-Relationships: a **Binder** holds a list of **Entry** instances; **Deck** subclasses **Binder** and adds validation and aggregate card counting. **Analytics** (`entities/analytics.py`) exposes module-level CMC helpers that take a **Deck** and use **Types** to skip basic lands. **Backend** writes and reads JSON envelopes for **Deck** and **Binder**; **Registry** rescans a directory of those files for a lightweight index. **ScryfallCard** comes from **pyscryfall**, not from pymtgdeck.
+Relationships: a **Binder** holds a list of **Entry** instances; **Deck** subclasses **Binder** and adds validation and aggregate card counting; **Sideboard** subclasses **Deck** with a fixed 15-card limit. **Analytics** (`entities/analytics.py`) exposes module-level helpers that take a **Deck** or **Binder** and use **Types** to identify basic lands and card types. **Backend** writes and reads JSON envelopes for **Deck**, **Binder**, and **Sideboard**; **Registry** rescans a directory of those files for a lightweight index. **IO** provides plain-text import/export. **ScryfallCard** comes from **pyscryfall**, not from pymtgdeck.
 
 ```mermaid
 classDiagram
@@ -88,30 +92,50 @@ classDiagram
         +from_dict(data) Deck$
     }
 
+    class Sideboard {
+        +MAX_SIDEBOARD_SIZE = 15
+        +from_dict(data) Sideboard$
+    }
+
     class Backend {
         +Path file_path
         +save(obj) str
-        +load(file_name) Deck|Binder
+        +load(file_name) Deck|Binder|Sideboard
     }
 
     class Registry {
         +Path path
         +list registry
-        +load_file(file_name) Deck|Binder
+        +load_file(file_name) Deck|Binder|Sideboard
     }
 
     class Types {
         <<module>>
         +is_basic_land(card) bool$
         +BASIC_LAND_NAMES list
+        +CARD_TYPES list
+        +MODIFIERS list
+        +LEGAL_FORMATS list
     }
 
     class Analytics {
         <<module>>
         +deck_min_cmc(deck) int$
         +deck_max_cmc(deck) int$
+        +deck_average_cmc(deck) float$
         +deck_cmc_distribution(deck) tuple$
         +deck_cmc_histogram(deck) tuple$
+        +deck_type_distribution(deck) dict$
+        +deck_color_distribution(deck) dict$
+        +validate_legality(deck, format) list$
+        +deck_diff(deck_a, deck_b) dict$
+        +mana_base_analysis(deck) dict$
+    }
+
+    class IO {
+        <<module>>
+        +deck_to_text(collection) str$
+        +deck_from_text(text, deck, session, set_code) Deck$
     }
 
     class Numpy {
@@ -121,20 +145,26 @@ classDiagram
     Entry --> ScryfallCard : card
     Binder "1" o-- "*" Entry : entries
     Binder <|-- Deck
+    Deck <|-- Sideboard
     Backend ..> Deck : load/save
     Backend ..> Binder : load/save
+    Backend ..> Sideboard : load/save
     Registry ..> Deck : load_file
     Registry ..> Binder : load_file
-    Analytics ..> Deck : CMC stats
+    Registry ..> Sideboard : load_file
+    Analytics ..> Deck : CMC/type/color stats
+    Analytics ..> Binder : type/color/diff/legality
     Analytics ..> Types : exclude basic lands
     Analytics ..> Numpy : bincount, histogram
-    Types ..> ScryfallCard : card.name
+    Types ..> ScryfallCard : card.name / type_line
+    IO ..> Binder : deck_to_text
+    IO ..> Deck : deck_from_text
 ```
 
 **Notes:**
 
 - On **Deck**, `get_card_count()` (no arguments) returns the **total** number of cards in the deck. On **Binder**, `get_card_count(card)` returns copies of **that** card. Deck uses `get_card_copy_count(card)` for per-card counts.
-- **Analytics** functions are exported from `pymtgdeck` but are not methods on **Deck**; they count one CMC per **Entry** (not per copy). See [Deck analytics (CMC)](#deck-analytics-cmc).
+- **Analytics** functions are exported from `pymtgdeck` but are not methods on **Deck**. CMC helpers (`deck_cmc_distribution`, `deck_cmc_histogram`, `deck_average_cmc`) are **weighted by copy count** (`Entry.count`). See [Deck analytics](#deck-analytics).
 
 ## Installation
 
@@ -150,7 +180,7 @@ Or install the package in editable mode with your preferred tool (example with p
 pip install -e .
 ```
 
-Runtime dependencies: `pyscryfall==0.1.2` and `numpy>=2.4.6` (declared in `pyproject.toml`).
+Runtime dependencies: `pyscryfall==0.2.0` and `numpy>=2.4.6` (declared in `pyproject.toml`).
 
 ## Usage examples
 
@@ -190,12 +220,29 @@ assert not deck.is_full()
 
 Default limits match the module constants `MAX_CARD_COUNT` and `MAX_CARD_COPY_COUNT` in `entities/deck.py` (40 and 4); you can override them per deck via the constructor.
 
-### Serialization
+### Sideboard (fixed 15-card limit)
 
-`Binder.to_dict()` / `Binder.from_dict()` include an optional `name` plus `entries`. `Deck.to_dict()` / `Deck.from_dict()` also persist `max_card_copy_count` and `max_card_count`.
+`Sideboard` is a `Deck` subclass with a hard-coded maximum of 15 cards and the same 4-copy-per-card limit. Basic lands bypass the copy limit.
 
 ```python
-from pymtgdeck import Binder, Deck
+from pymtgdeck import Sideboard
+
+sideboard = Sideboard(name="My Sideboard")
+assert sideboard.max_card_count == 15
+
+sideboard.add_card(card, count=4)
+assert sideboard.get_card_copy_count(card) == 4
+assert not sideboard.is_full()
+```
+
+`Sideboard` serializes and persists via `to_dict()` / `from_dict()` and `Backend`, exactly like `Deck`.
+
+### Serialization
+
+`Binder.to_dict()` / `Binder.from_dict()` include an optional `name` plus `entries`. `Deck.to_dict()` / `Deck.from_dict()` also persist `max_card_copy_count` and `max_card_count`. `Sideboard.from_dict()` always restores `max_card_count` to 15.
+
+```python
+from pymtgdeck import Binder, Deck, Sideboard
 
 binder = Binder(name="My binder")
 # ... add cards ...
@@ -208,16 +255,44 @@ deck = Deck(name="My deck")
 
 deck_dump = deck.to_dict()
 deck2 = Deck.from_dict(deck_dump)
+
+sideboard = Sideboard(name="My sideboard")
+# ... add cards ...
+
+sb_dump = sideboard.to_dict()
+sideboard2 = Sideboard.from_dict(sb_dump)
 ```
+
+### Text import / export
+
+`deck_to_text` and `deck_from_text` use the standard plain-text deck format: one entry per line as `<count> <card name>`. Lines starting with `//` are treated as comments and ignored; blank lines are skipped. `deck_from_text` looks each card up on Scryfall by exact name.
+
+```python
+from pymtgdeck import Deck, deck_to_text, deck_from_text
+
+deck = Deck(name="FNM", max_card_count=60)
+# ... add cards ...
+
+text = deck_to_text(deck)
+# "4 Lightning Bolt\n2 Counterspell\n..."
+
+# Re-import (requires network access to Scryfall)
+imported = deck_from_text(text, Deck(max_card_count=60))
+
+# Optional kwargs: session (requests.Session) and set_code restrict the Scryfall lookup
+imported_from_set = deck_from_text(text, Deck(), set_code="lea")
+```
+
+`deck_to_text` accepts any `Binder` (including `Deck` and `Sideboard`). `deck_from_text` returns a `Deck`; pass a pre-constructed `Deck` as the second argument to control limits, or omit it to get a default `Deck`.
 
 ### Persistence (`Backend`)
 
-`Backend` writes each deck or binder to a single JSON file under a configurable directory (default `~/.pymtgdeck`). The on-disk shape is an **envelope** with `timestamp`, `type` (`"Deck"` or `"Binder"`), `name` (same as the object’s `name`), and `data` (the result of `to_dict()` on the deck or binder).
+`Backend` writes each deck, binder, or sideboard to a single JSON file under a configurable directory (default `~/.pymtgdeck`). The on-disk shape is an **envelope** with `timestamp`, `type` (`"Deck"`, `"Binder"`, or `"Sideboard"`), `name` (same as the object's `name`), and `data` (the result of `to_dict()`).
 
 The file basename is the SHA-256 hex digest of the UTF-8 encoded `name`, with a `.json` suffix. Saving again for the same `name` raises `OSError` so you do not silently overwrite an existing file.
 
 ```python
-from pymtgdeck import Deck, Backend
+from pymtgdeck import Deck, Sideboard, Backend
 from pathlib import Path
 
 store = Path("/tmp/mtg-store")
@@ -228,13 +303,19 @@ deck = Deck(name="FNM")
 
 filename = backend.save(deck)          # returns e.g. "<hex>.json"
 restored = backend.load(filename)
+
+sideboard = Sideboard(name="FNM Side")
+# ... add cards ...
+
+sb_file = backend.save(sideboard)
+sb_restored = backend.load(sb_file)   # returns a Sideboard instance
 ```
 
-Use a non-`None` **`name`** on the deck or binder before `save`, so the filename is stable and hashing is defined.
+Use a non-`None` **`name`** on the object before `save`, so the filename is stable and hashing is defined.
 
 ### Registry scan (`Registry`)
 
-`Registry` reads every `*.json` file in its directory (default `~/.pymtgdeck`). For each file whose envelope has `type` `"Deck"` or `"Binder"`, it records `name`, `type`, and `timestamp` in an in-memory list. `str(registry)` pretty-prints that index. For round-tripping files written by `Backend`, use `Backend.load` with the basename returned from `save`; `Registry` also exposes `load_file` for reloading (see `persistence/registry.py` for the exact argument semantics).
+`Registry` reads every `*.json` file in its directory (default `~/.pymtgdeck`). For each file whose envelope has `type` `"Deck"`, `"Binder"`, or `"Sideboard"`, it records `name`, `type`, and `timestamp` in an in-memory list. `str(registry)` pretty-prints that index. `Registry` also exposes `load_file` for reloading individual files.
 
 ### Entry and JSON fixtures
 
@@ -248,30 +329,68 @@ data = entry.to_dict()
 restored = Entry.from_dict(data)
 ```
 
-Tests load cards from files shaped like Scryfall’s **card list** response (see `tests/data/*.json`), using `ScryfallCardList.from_json_string` and taking `data[0]`.
+Tests load cards from files shaped like Scryfall's **card list** response (see `tests/data/*.json`), using `ScryfallCardList.from_json_string` and taking `data[0]`.
 
-### Deck analytics (CMC)
+### Deck analytics
 
-Analytics helpers live in `entities/analytics.py` and are exported from the package root. They inspect a `Deck`’s **entries** (one row per distinct card), use each card’s integer **CMC** (`int(entry.card.cmc)`), and **exclude basic lands** (Island, Plains, Swamp, Mountain, Forest) via `is_basic_land` in `entities/types.py`. Copy counts (`Entry.count`) do not change the distribution—only whether a non–basic-land card appears in the deck.
+Analytics helpers live in `entities/analytics.py` and are exported from the package root. They operate on a `Deck` or `Binder`'s **entries** and **exclude basic lands** (Island, Plains, Swamp, Mountain, Forest) where noted.
 
-| Function | Role |
-|----------|------|
-| `deck_min_cmc(deck)` | Lowest CMC among non–basic-land entries |
-| `deck_max_cmc(deck)` | Highest CMC among non–basic-land entries |
-| `deck_cmc_distribution(deck)` | `(counts, bin_edges)` — per-entry counts per CMC bucket (`numpy.bincount` shape) |
-| `deck_cmc_histogram(deck)` | Histogram over the distribution buckets (`numpy.histogram` shape) |
+CMC helpers weight by copy count (`Entry.count`) — a 4-of creature contributes 4 data points to the distribution.
 
-An empty deck (or one with only basic lands) yields empty arrays from the distribution/histogram helpers. `deck_min_cmc` / `deck_max_cmc` raise `ValueError` when there is no qualifying entry.
+| Function | Accepts | Role |
+|----------|---------|------|
+| `deck_min_cmc(deck)` | `Deck` | Lowest CMC among non–basic-land entries |
+| `deck_max_cmc(deck)` | `Deck` | Highest CMC among non–basic-land entries |
+| `deck_average_cmc(deck)` | `Deck` | Mean CMC of non–basic-land cards, weighted by copy count |
+| `deck_cmc_distribution(deck)` | `Deck` | `(counts, bin_edges)` — copy-weighted counts per CMC bucket (`numpy.bincount` shape) |
+| `deck_cmc_histogram(deck)` | `Deck` | Histogram over the distribution buckets (`numpy.histogram` shape) |
+| `deck_type_distribution(deck)` | `Binder` | `{type: count}` — cards counted by primary type (Creature, Instant, …), weighted by copies; a card matching multiple types is counted in each |
+| `deck_color_distribution(deck)` | `Binder` | `{color: pip_count}` — colored mana pips (W/U/B/R/G) across all non-basic-land cards, weighted by copies |
+| `validate_legality(deck, format)` | `Binder` | Returns a list of card names not legal in the given format string (e.g. `"modern"`, `"standard"`) |
+| `deck_diff(deck_a, deck_b)` | `Binder` | `{"added": [...], "removed": [...], "changed": [...]}` — entries present only in `deck_b`, only in `deck_a`, or with a different count |
+| `mana_base_analysis(deck)` | `Binder` | `{"pip_requirements": {color: int}, "mana_sources": {color: int}, "warnings": [str]}` — compares pip demand to land supply and surfaces imbalances |
+
+An empty deck (or one with only basic lands) yields empty arrays from the distribution/histogram helpers. `deck_min_cmc` / `deck_max_cmc` / `deck_average_cmc` raise `ValueError` when there are no qualifying entries.
 
 ```python
-from pymtgdeck import Deck, deck_cmc_distribution, deck_max_cmc, deck_min_cmc
+from pymtgdeck import (
+    Deck,
+    deck_cmc_distribution, deck_average_cmc, deck_max_cmc, deck_min_cmc,
+    deck_type_distribution, deck_color_distribution,
+    validate_legality, deck_diff, mana_base_analysis,
+)
 
 deck = Deck(name="Curve check")
 # ... add cards ...
 
 low, high = deck_min_cmc(deck), deck_max_cmc(deck)
+avg = deck_average_cmc(deck)
 counts, bin_edges = deck_cmc_distribution(deck)
+by_type = deck_type_distribution(deck)
+by_color = deck_color_distribution(deck)
+illegal = validate_legality(deck, "modern")
+analysis = mana_base_analysis(deck)
+
+deck2 = Deck(name="Updated")
+# ... add/remove cards ...
+diff = deck_diff(deck, deck2)
+# {"added": [...], "removed": [...], "changed": [...]}
 ```
+
+#### Available format strings for `validate_legality`
+
+`LEGAL_FORMATS` (exported from `pymtgdeck`) lists all accepted format names: `standard`, `future`, `historic`, `timeless`, `gladiator`, `pioneer`, `modern`, `legacy`, `pauper`, `vintage`, `penny`, `commander`, `oathbreaker`, `standardbrawl`, `brawl`, `alchemy`, `paupercommander`, `duel`, `oldschool`, `premodern`, `predh`, `tlr`.
+
+### Exported constants
+
+`pymtgdeck` exports the following constants from `entities/types.py`:
+
+| Name | Contents |
+|------|----------|
+| `BASIC_LAND_NAMES` | `["Island", "Plains", "Swamp", "Mountain", "Forest"]` |
+| `CARD_TYPES` | `["Land", "Creature", "Instant", "Sorcery", "Enchantment", "Artifact", "Planeswalker"]` |
+| `MODIFIERS` | `["Snow", "Snow-Covered", "Legendary", "Mythic"]` |
+| `LEGAL_FORMATS` | Full list of Scryfall format strings accepted by `validate_legality` |
 
 ## Test procedure
 
@@ -297,7 +416,7 @@ pytest tests/deck_test.py     # single module
 pytest tests/ -k serialization  # tests whose name contains the substring
 ```
 
-The suite covers `Entry`, `Binder`, and `Deck` (add/remove, limits, serialization, optional `name`), `Backend` save/load and collision behavior, and deck CMC analytics (`analytics_test.py`). Fixtures are offline JSON files; tests that call `search_cards_by_name` would need network access and are not part of the default suite.
+The suite covers `Entry`, `Binder`, `Deck`, and `Sideboard` (add/remove, limits, serialization, optional `name`), `Backend` save/load and collision behavior, deck CMC analytics (`analytics_test.py`), and plain-text import/export (`io_test.py`). Fixtures are offline JSON files; tests that call `search_cards_by_name` would need network access and are not part of the default suite.
 
 ## AI Disclosure
 
