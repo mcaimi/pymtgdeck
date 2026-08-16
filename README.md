@@ -420,4 +420,4 @@ The suite covers `Entry`, `Binder`, `Deck`, and `Sideboard` (add/remove, limits,
 
 ## AI Disclosure
 
-Part of this project has been developed with the help of an AI Model. Specifically I used a locally-hosted [QWEN3-CODER](https://ollama.com/library/qwen3-coder) using [Ollama](https://ollama.ai).
+This is *not* a vibe-coded project, but parts of this project has been developed with the help of an AI Model. Specifically I used a locally-hosted [Qwen-3.5-35B-A3B-GGUF](https://huggingface.co/unsloth/Qwen3.5-35B-A3B-GGUF) model served via llama.cpp on my M1 Pro Macbook Pro. Earlier work has been aided by [QWEN3-CODER](https://ollama.com/library/qwen3-coder) using [Ollama](https://ollama.ai).
